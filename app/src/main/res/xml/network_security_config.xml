@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Permitir HTTP cleartext para simular la vulnerabilidad original -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">cdn.vungle.com</domain>
+        <domain includeSubdomains="true">api.adnetwork.com</domain>
+        <domain includeSubdomains="true">updates.gameapp.com</domain>
+        <domain includeSubdomains="true">static.ads.com</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain includeSubdomains="true">192.168.0.189</domain>
+        <domain includeSubdomains="true">localhost</domain>
+    </domain-config>
+
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

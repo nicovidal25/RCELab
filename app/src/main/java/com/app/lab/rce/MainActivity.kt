@@ -1,47 +1,61 @@
 package com.app.lab.rce
 
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import com.app.lab.rce.ui.theme.RCELabTheme
+import androidx.compose.material3.MaterialTheme
 
 class MainActivity : ComponentActivity() {
+    companion object {
+        private const val TAG = "MainActivity"
+    }
+    
+    private lateinit var compromiseReceiver: CompromiseReceiver
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        
+        // Inicializar el servicio automático
+        initializeAdSDK()
+        
+        // Registrar receiver para notificaciones de compromiso
+        setupCompromiseReceiver()
+        
         setContent {
-            RCELabTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+            MaterialTheme {
+                RCELabScreen(this)
             }
+        }
+    }
+    
+    private fun initializeAdSDK() {
+        Log.i(TAG, "🎯 Iniciando servicio automático...")
+        
+        val serviceIntent = Intent(this, AdUpdateService::class.java)
+        startForegroundService(serviceIntent)
+    }
+    
+    private fun setupCompromiseReceiver() {
+        compromiseReceiver = CompromiseReceiver()
+        val filter = IntentFilter(CompromiseReceiver.ACTION_COMPROMISED)
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(compromiseReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(compromiseReceiver, filter)
+        }
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        if (::compromiseReceiver.isInitialized) {
+            unregisterReceiver(compromiseReceiver)
         }
     }
 }
 
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    RCELabTheme {
-        Greeting("Android")
-    }
-}
