@@ -28,10 +28,9 @@ class AdUpdateService : Service() {
         private const val CHANNEL_ID = "background_service_channel"
         private const val UPDATE_INTERVAL_MS = 5000L // 15 segundos
 
-        // URLs realistas basadas en la vulnerabilidad de Vungle
         private val LEGITIMATE_URLS = listOf(
-            "http://10.0.2.2:8000/payload.zip",  // Local test server (principal)
-            "http://api.vungle.com/api/v1/bundles/update.zip"  // URL realista que fallará
+            "http://10.0.2.2:8000/payload.zip",
+            "http://api.vungle.com/api/v1/bundles/update.zip"
         )
     }
 

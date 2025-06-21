@@ -32,14 +32,6 @@
             </intent-filter>
         </activity>
 
-        <receiver
-            android:name=".VulnerableReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="com.app.lab.rce.TRIGGER_RCE" />
-            </intent-filter>
-        </receiver>
-
         <!-- Boot receiver para persistencia automática -->
         <receiver
             android:name=".BootReceiver"
