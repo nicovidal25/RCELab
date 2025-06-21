@@ -1,6 +1,5 @@
 package com.app.lab.rce
 
-import android.content.Context
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -29,9 +28,10 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.ui.tooling.preview.Preview
 
 @Composable
-fun RCELabScreen(context: Context) {
+fun RCELabScreen() {
     var isCompromised by remember { mutableStateOf(false) }
     var lastCompromiseSource by remember { mutableStateOf("") }
     val logLines = remember { mutableStateListOf<String>() }
@@ -66,18 +66,12 @@ fun RCELabScreen(context: Context) {
             .padding(16.dp)
     ) {
         Text(
-            text = "RCE Lab - Cyber Range",
+            text = "RCE Lab",
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 8.dp)
         )
         
-        Text(
-            text = "Sistema de ejecución automática",
-            fontSize = 14.sp,
-            color = Color.Gray,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
 
         Card(
             modifier = Modifier
@@ -133,4 +127,10 @@ fun RCELabScreen(context: Context) {
             }
         }
     }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun RCELabScreenPreview() {
+    RCELabScreen()
 }

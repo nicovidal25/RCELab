@@ -28,7 +28,7 @@ class MainActivity : ComponentActivity() {
         
         setContent {
             MaterialTheme {
-                RCELabScreen(this)
+                RCELabScreen()
             }
         }
     }
