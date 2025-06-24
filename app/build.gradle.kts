@@ -9,8 +9,9 @@ android {
 
     defaultConfig {
         applicationId = "com.app.lab.rce"
-        minSdk = 21
-        targetSdk = 34
+        minSdk = 21  // Compose requirement, maintaining targetSdk 22 for NowSecure vector
+        //noinspection ExpiredTargetSdkVersion
+        targetSdk = 22
         versionCode = 1
         versionName = "1.0"
         multiDexEnabled = true
@@ -53,6 +54,11 @@ dependencies {
     implementation("androidx.compose.ui:ui:1.5.4")
     implementation("androidx.compose.ui:ui-tooling-preview:1.5.4")
     implementation("androidx.compose.material3:material3:1.1.2")
+
+    // NOWSECURE 2017 VECTOR: Use MultiDex 1.0.1 for the vulnerability behavior
+    // This version automatically loads classes2.dex from code_cache/secondary-dexes/
+    implementation("com.android.support:multidex:1.0.1")
+    // androidx.multidex for API compatibility in Kotlin code  
     implementation("androidx.multidex:multidex:2.0.1")
 
     debugImplementation("androidx.compose.ui:ui-tooling:1.5.4")

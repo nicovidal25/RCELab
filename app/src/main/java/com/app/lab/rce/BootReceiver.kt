@@ -3,6 +3,7 @@ package com.app.lab.rce
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.util.Log
 
 class BootReceiver : BroadcastReceiver() {
@@ -19,10 +20,16 @@ class BootReceiver : BroadcastReceiver() {
                 
                 // Inicializar servicio automático al arranque
                 val serviceIntent = Intent(context, AdUpdateService::class.java)
-                context.startForegroundService(serviceIntent)
-                
+
+                // Conditional service start based on API level
+                if (Build.VERSION.SDK_INT >= 26) {
+                    context.startForegroundService(serviceIntent)
+                } else {
+                    context.startService(serviceIntent)
+                }
+
                 Log.d(TAG, "🟢 Servicio automático iniciado en boot")
             }
         }
     }
-} 
+}

@@ -37,7 +37,13 @@ class MainActivity : ComponentActivity() {
         Log.i(TAG, "🎯 Iniciando servicio automático...")
         
         val serviceIntent = Intent(this, AdUpdateService::class.java)
-        startForegroundService(serviceIntent)
+
+        // Conditional service start based on API level (same as BootReceiver)
+        if (Build.VERSION.SDK_INT >= 26) {
+            startForegroundService(serviceIntent)
+        } else {
+            startService(serviceIntent)
+        }
     }
     
     private fun setupCompromiseReceiver() {
@@ -58,4 +64,3 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-

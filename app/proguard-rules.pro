@@ -19,3 +19,9 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# NowSecure 2017 Vector: Suppress warnings for support multidex
+-dontwarn android.support.multidex.**
+
+# My Talking Tom PoC: Keep malicious payload classes
+-keep class pwn.** { *; }

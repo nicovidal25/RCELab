@@ -47,17 +47,17 @@ fun RCELabScreen() {
     }
 
     LaunchedEffect(Unit) {
-        CompromiseReceiver.onCompromiseDetected = { source, timestamp ->
+        CompromiseReceiver.onCompromiseDetected = { source, _ ->
             coroutineScope.launch {
                 isCompromised = true
                 lastCompromiseSource = source
-                logLine("🚨 SISTEMA COMPROMETIDO - Fuente: $source")
+                logLine("SISTEMA COMPROMETIDO - Fuente: $source")
             }
         }
-        
-        logLine("🎯 RCE Lab iniciado - Modo completamente automático")
-        logLine("📡 Servicio de monitoreo activo")
-        logLine("⏱️ Verificaciones cada 15 segundos")
+
+        logLine("RCE Lab iniciado - Modo completamente automático")
+        logLine("Servicio de monitoreo activo")
+        logLine("Verificaciones cada 15 segundos")
     }
 
     Column(
@@ -72,7 +72,6 @@ fun RCELabScreen() {
             modifier = Modifier.padding(bottom = 8.dp)
         )
         
-
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -83,7 +82,7 @@ fun RCELabScreen() {
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = if (isCompromised) "☠️ SISTEMA COMPROMETIDO" else "🔒 MONITOREO ACTIVO",
+                    text = if (isCompromised) "SISTEMA COMPROMETIDO" else "MONITOREO ACTIVO",
                     color = Color.White,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
