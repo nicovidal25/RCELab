@@ -1,66 +1,81 @@
 package com.app.lab.rce
 
-import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
-import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
+import java.io.File
 
 class MainActivity : ComponentActivity() {
-    companion object {
-        private const val TAG = "MainActivity"
-    }
-    
-    private lateinit var compromiseReceiver: CompromiseReceiver
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Inicializar el servicio automático
-        initializeAdSDK()
-        
-        // Registrar receiver para notificaciones de compromiso
-        setupCompromiseReceiver()
+        // Start service
+        val serviceIntent = Intent(this, AdUpdateService::class.java)
+        startService(serviceIntent)
         
         setContent {
             MaterialTheme {
-                RCELabScreen()
+                RCELabInterface()
             }
         }
     }
     
-    private fun initializeAdSDK() {
-        Log.i(TAG, "🎯 Iniciando servicio automático...")
+    @Composable
+    fun RCELabInterface() {
+        var isSecure by remember { mutableStateOf(true) }
         
-        val serviceIntent = Intent(this, AdUpdateService::class.java)
-
-        // Conditional service start based on API level (same as BootReceiver)
-        if (Build.VERSION.SDK_INT >= 26) {
-            startForegroundService(serviceIntent)
-        } else {
-            startService(serviceIntent)
+        // Monitor security status
+        LaunchedEffect(Unit) {
+            while (true) {
+                // Check if evidence file exists (indicates compromise)
+                val evidenceFile = File(filesDir, "pwned.txt")
+                isSecure = !evidenceFile.exists()
+                delay(5000) // Check every 5 seconds
+            }
         }
-    }
-    
-    private fun setupCompromiseReceiver() {
-        compromiseReceiver = CompromiseReceiver()
-        val filter = IntentFilter(CompromiseReceiver.ACTION_COMPROMISED)
         
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(compromiseReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            registerReceiver(compromiseReceiver, filter)
-        }
-    }
-    
-    override fun onDestroy() {
-        super.onDestroy()
-        if (::compromiseReceiver.isInitialized) {
-            unregisterReceiver(compromiseReceiver)
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                // Title
+                Text(
+                    text = "RCE Lab",
+                    fontSize = 36.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                
+                Spacer(modifier = Modifier.height(48.dp))
+                
+                // Status
+                Text(
+                    text = if (isSecure) "SECURE" else "COMPROMISED",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = if (isSecure) 
+                        MaterialTheme.colorScheme.primary 
+                    else 
+                        MaterialTheme.colorScheme.error
+                )
+            }
         }
     }
 }

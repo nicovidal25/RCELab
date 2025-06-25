@@ -1,10 +1,46 @@
-*.iml
-.gradle
-/local.properties
-/.idea/
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+# Gradle files
+.gradle/
+build/
+*/build/
+
+# Local configuration file (sdk path, etc)
 local.properties
+
+# Android Studio generated files
+.idea/
+*.iml
+.externalNativeBuild
+.cxx/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Exploit artifacts
+exploit_bundle.zip
+*.dex
+*.jar
+*.class
+payload/bin/
+payload/build/
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# Android build outputs
+app/build/
+*.apk
+*.aab
+
+# Payload build outputs
+*.zip
+
+# Mitmproxy cache
+mitmproxy/*.zip
