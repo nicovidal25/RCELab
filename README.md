@@ -5,8 +5,27 @@
 Este laboratorio replica **exactamente** la vulnerabilidad del PoC "My Talking Tom" que utiliza:
 
 - **Path traversal ZIP** para colocar archivos maliciosos automáticamente
-- **MultiDex 1.0.1** que carga automáticamente `classes2.zip` desde `code_cache/secondary-dexes/`
+- **MultiDex 1.0.1** que carga automáticamente `classes2.zip` desde `code_cache/secondary-dexes/` (
+  Dalvik ≤ API 20)
+- **DexClassLoader explícito** para cargar payload en Android moderno (ART ≥ API 21)
 - **Static initializer** en payload DEX para ejecución automática al cargar la clase
+
+## Compatibilidad Android
+
+### Dalvik (API ≤ 20) - Vector Original
+
+- **MultiDex 1.0.1** funciona normalmente
+- Auto-carga `classes2.zip` desde `secondary-dexes/`
+- Requiere reinicio de app para activar payload
+
+### ART (API ≥ 21) - Vector Moderno
+
+- **MultiDex 1.0.1** se auto-deshabilita con mensaje:
+  ```
+  I MultiDex: VM has multidex support, MultiDex support library is disabled
+  ```
+- **DexClassLoader** carga payload inmediatamente después de path traversal
+- **No requiere reinicio** - RCE inmediato
 
 ## Arquitectura del Ataque
 
@@ -18,9 +37,15 @@ Creative ─▶│ (zip)   │── busybox  → …/files/busybox            r
   .zip     └─────────┘── classes2.zip → …/code_cache/…         …            │
                                                                └─────────────┘
                          ▼                                        ▲
-                    AdUpdateService                 MultiDex 1.x carga
-                  descomprime el ZIP                <pkg>-classes2.zip
-                                                   (contiene classes.dex)
+                    AdUpdateService                               │
+                  descomprime el ZIP                             │
+                         │                                       │
+                         ▼                                       │
+                ┌─────────────────┐                             │
+                │ Detección OS:   │                             │
+                │ Dalvik ≤ API 20 │ ──── MultiDex auto-load ────┘
+                │ ART ≥ API 21    │ ──── DexClassLoader explícito
+                └─────────────────┘       (inmediato)
 ```
 
 ## Comandos Rápidos
@@ -60,8 +85,9 @@ Contiene dos entradas con path traversal:
 
 ### 2. Aplicación Vulnerable
 
-- **MultiDex 1.0.1**: Carga automáticamente ZIPs desde `secondary-dexes/`
-- **AdUpdateService**: Descarga y extrae ZIPs cada 15 segundos
+- **MultiDex 1.0.1**: Carga automáticamente ZIPs desde `secondary-dexes/` (solo Dalvik)
+- **DexClassLoader**: Carga explícita para compatibilidad ART (API 21+)
+- **AdUpdateService**: Descarga, extrae ZIPs y ejecuta payload inmediatamente
 - **RCEApplication**: Custom Application con `MultiDex.install()`
 
 ### 3. Payload Malicioso
@@ -81,9 +107,9 @@ Contiene dos entradas con path traversal:
 
 ```
 ├── build_payload.sh              # Construye exploit_bundle.zip
-├── app/src/main/java/com/app/lab/rce/
+├── app/src/main/java/com/app.lab/rce/
 │   ├── RCEApplication.kt          # Custom Application (MultiDex)
-│   ├── AdUpdateService.kt         # Descarga y extrae ZIPs
+│   ├── AdUpdateService.kt         # Descarga, extrae y carga payload
 │   └── MainActivity.kt            # Inicia servicio automático
 ├── payload/src/pwn/Shell.java     # Payload con static initializer
 └── mitmproxy/inject_payload.py    # MITM para inyección (opcional)
@@ -91,10 +117,23 @@ Contiene dos entradas con path traversal:
 
 ## Indicadores de Compromiso
 
-### Logs Esperados
+### Logs Esperados (ART API 21+)
 ```
-# MultiDex carga automáticamente el payload
-# No hay logs específicos - el payload es silencioso
+D VungleService: 💥 MY TALKING TOM POC: ZIP extraído con path traversal
+D VungleService: 📂 Archivos colocados automáticamente en:
+D VungleService:    - /files/busybox (executable)
+D VungleService:    - /code_cache/secondary-dexes/classes2.zip
+D VungleService: 🚀 Cargando DEX: com.app.lab.rce-classes2.zip
+E VungleService: 💀 PAYLOAD CARGADO: pwn.Shell
+E VungleService: 🔴 SISTEMA COMPROMETIDO - RCE EJECUTADO
+```
+
+### Logs Esperados (Dalvik API ≤ 20)
+
+```
+I MultiDex: Installing application
+I MultiDex: VM has multidx support = false
+# Payload se ejecuta en próximo reinicio
 ```
 
 ### Archivos Creados
@@ -117,7 +156,7 @@ adb shell cat /data/data/com.app.lab.rce/files/pwned.txt
 
 - Usar únicamente en entornos controlados
 - No ejecutar en dispositivos de producción
-- Respetar las leyes locales de ciberseguridad
+- Respetar las leyes Locales de ciberseguridad
 
 ## Referencias
 
