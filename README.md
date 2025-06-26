@@ -17,6 +17,59 @@ Esta vulnerabilidad fue descubierta por **NowSecure en 2017** y afecta aplicacio
 4. MultiDex 1.0.1 detecta automáticamente el archivo DEX y lo carga
 5. El código malicioso se ejecuta inmediatamente (static initializer)
 
+## Implementación del Path Traversal
+
+### **Path Traversal Real vs Simulado**
+
+El `exploit_bundle.zip` contiene una entrada con path traversal real:
+
+```
+../../../../data/data/com.app.lab.rce/code_cache/secondary-dexes/com.app.lab.rce-classes2.zip
+```
+
+Sin embargo, esta implementación **simula el resultado del path traversal** en lugar de ejecutarlo
+directamente:
+
+#### **¿Por qué simular en lugar de usar path traversal real?**
+
+1. **Seguridad del Sistema Host**: Path traversal real podría escribir fuera del sandbox de la app
+2. **Compatibilidad**: Funciona en cualquier versión de Android sin depender de permisos específicos
+3. **Confiabilidad**: Android moderno tiene protecciones contra path traversal
+4. **Propósito Educativo**: El resultado final es idéntico - DEX malicioso cargado por MultiDex
+
+#### **Flujo de la Implementación:**
+
+```kotlin
+// 1. Extrae ZIP en cacheDir (seguro)
+File(cacheDir, entryName)
+
+// 2. Detecta archivos classes2.zip  
+if (entryName.contains("classes2.zip"))
+
+// 3. Copia manualmente a secondary-dexes (simula path traversal)
+file.copyTo(File(targetDir, "com.app.lab.rce-classes2.zip"))
+
+// 4. MultiDex carga automáticamente → RCE
+```
+
+#### **Equivalencia Funcional:**
+
+| Path Traversal Real                           | Implementación Simulada                              |
+|-----------------------------------------------|------------------------------------------------------|
+| ZIP escribe directamente en `secondary-dexes` | ZIP extrae en `cacheDir` → copia a `secondary-dexes` |
+| Vulnerable a protecciones del OS              | Siempre funciona                                     |
+| Riesgo para el sistema host                   | Seguro para demostraciones                           |
+| **Resultado: DEX en secondary-dexes**         | **Resultado: DEX en secondary-dexes**                |
+
+### **Valor Educativo**
+
+Ambos enfoques demuestran el mismo concepto de seguridad:
+
+- ✅ **Vector de ataque**: ZIP malicioso con contenido controlado por atacante
+- ✅ **Vulnerabilidad**: MultiDex 1.0.1 carga automáticamente DEX desde `secondary-dexes`
+- ✅ **Impacto**: Ejecución remota de código sin interacción del usuario
+- ✅ **Mitigación**: Actualizar a versiones más recientes de MultiDex
+
 ## Requisitos
 
 - Android SDK instalado
