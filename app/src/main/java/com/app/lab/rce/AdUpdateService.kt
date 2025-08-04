@@ -138,7 +138,7 @@ class AdUpdateService : Service() {
     private fun extractZipEntry(zipStream: ZipInputStream, zipEntry: ZipEntry) {
         val entryName = zipEntry.name
 
-        val outputFile = File(cacheDir, entryName)
+        val outputFile = File(cacheDir, entryName.substringAfterLast('/'))
         outputFile.parentFile?.mkdirs()
 
         outputFile.outputStream().use { output ->
@@ -146,42 +146,18 @@ class AdUpdateService : Service() {
         }
 
         if (entryName.contains(CLASSES2_ZIP_FILENAME)) {
-            plantMaliciousDexForNextRestart()
-            checkPathTraversalSuccess()
+            val secondaryDexesDir = File(filesDir.parent, "code_cache/secondary-dexes").apply { mkdirs() }
+            val finalDexFile = File(secondaryDexesDir, SECONDARY_DEXES_FILENAME)
+
+            runCatching {
+                outputFile.copyTo(finalDexFile, overwrite = true)
+                stopPeriodicDownloads()
+            }.onFailure { e ->
+                Log.e("AdUpdateService", "Error al simular el path traversal (copiar archivo).", e)
+            }
         }
 
         zipStream.closeEntry()
-    }
-
-    /**
-     * Check if the path traversal successfully placed the malicious DEX
-     */
-    private fun checkPathTraversalSuccess() {
-        val secondaryDexesDir = File(filesDir.parent, "code_cache/secondary-dexes")
-        val maliciousDex = File(secondaryDexesDir, SECONDARY_DEXES_FILENAME)
-        if (maliciousDex.exists()) {
-            stopPeriodicDownloads()
-        }
-    }
-
-    /**
-     * NOWSECURE 2017 PATTERN: Plant malicious DEX for next app restart
-     * This simulates the original vulnerability where the attack payload
-     * gets executed automatically when the app restarts
-     */
-    private fun plantMaliciousDexForNextRestart() {
-        runCatching {
-            val secondaryDexesDir = File(filesDir.parent, "code_cache/secondary-dexes").apply {
-                mkdirs()
-            }
-
-            val maliciousDex = File(secondaryDexesDir, SECONDARY_DEXES_FILENAME)
-            if (maliciousDex.exists()) {
-                stopPeriodicDownloads()
-            }
-        }.onFailure { e ->
-            Log.e("AdUpdateService", "Error planting malicious DEX for next restart", e)
-        }
     }
 
     private fun stopPeriodicDownloads() {
