@@ -136,18 +136,6 @@ adb shell run-as com.app.lab.rce cat files/pwned.txt
 lsof -i :4444
 ```
 
-### Logs esperados:
-
-```
-NOWSECURE 2017: Malicious DEX planted for next restart
-SIMULATION: Triggering app restart...
-NOWSECURE 2017: Payload auto-loaded by MultiDex
-RCE: Static initializer executed
-RCE: Evidence file created successfully
-RCE: Constructor executed - launching reverse shell
-NOWSECURE 2017: RCE executed on app startup
-```
-
 ## Componentes del exploit
 
 - **`AdUpdateService.kt`**: Descarga ZIPs cada 10 segundos y simula path traversal
